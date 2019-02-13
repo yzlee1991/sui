@@ -1,0 +1,7 @@
+/.idea
+/sui-client/target
+/sui-common/target
+/sui-server/target
+/sui-corpse/target
+*.iml
+*.log
