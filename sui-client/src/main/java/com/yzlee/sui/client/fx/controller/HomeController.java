@@ -2,11 +2,13 @@ package com.yzlee.sui.client.fx.controller;
 
 import com.google.gson.Gson;
 import com.yzlee.sui.client.Client;
+import com.yzlee.sui.client.enums.MenuItemEnum;
 import com.yzlee.sui.client.filter.PushFilter;
 import com.yzlee.sui.client.fx.Main;
 import com.yzlee.sui.client.listener.Listener;
 import com.yzlee.sui.client.modle.TableTask;
 import com.yzlee.sui.client.modle.TreeEntity;
+import com.yzlee.sui.client.modle.WaitStage;
 import com.yzlee.sui.common.abs.Filter;
 import com.yzlee.sui.common.inf.FileInf;
 import com.yzlee.sui.common.inf.HostInf;
@@ -18,6 +20,7 @@ import com.yzlee.sui.common.modle.push.PushEvent;
 import com.yzlee.sui.common.proxy.CommonRequestSocketHandle;
 import com.yzlee.sui.common.rmi.RmiClient;
 import com.yzlee.sui.common.service.FileService;
+import com.yzlee.sui.common.utils.NatUtils;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -39,6 +42,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Proxy;
+import java.net.InetAddress;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -155,150 +159,199 @@ public class HomeController implements Initializable {
 
                 MyMenu myMenu = MyMenu.newInstance();
                 myMenu.getItems().removeAll(myMenu.getItems());
-                MenuItem menuItem = null;
+                List<MenuItem> menuItemList = new ArrayList<>();
 
                 if (type == TreeEntity.TYPE.ROOT || type == TreeEntity.TYPE.DIRECTORY) {
                     MyMenu.newInstance().hide();
                     return;
                 } else if (type == TreeEntity.TYPE.HOST) {
-                    menuItem = new MenuItem("连接主机");
+                    MenuItem menuItem = new MenuItem(MenuItemEnum.CONNECT_HOST.NAME);
+                    menuItem.setUserData(MenuItemEnum.CONNECT_HOST.VAL);
+                    menuItemList.add(menuItem);
+                    menuItem = new MenuItem(MenuItemEnum.REMOTE_SREEN.NAME);
+                    menuItem.setUserData(MenuItemEnum.REMOTE_SREEN.VAL);
+                    menuItemList.add(menuItem);
                 } else if (type == TreeEntity.TYPE.DISK) {
-                    menuItem = new MenuItem("连接硬盘");
+                    MenuItem menuItem = new MenuItem(MenuItemEnum.CONNECT_DISK.NAME);
+                    menuItem.setUserData(MenuItemEnum.CONNECT_DISK.VAL);
+                    menuItemList.add(menuItem);
                 } else if (type == TreeEntity.TYPE.FILE) {
-                    menuItem = new MenuItem("下载");
+                    MenuItem menuItem = new MenuItem(MenuItemEnum.DOWNLOAD.NAME);
+                    menuItem.setUserData(MenuItemEnum.DOWNLOAD.VAL);
+                    menuItemList.add(menuItem);
                 }
 
                 // 点击事件
-                menuItem.setOnAction(param -> {
-                    try {
-                        if (selectEntity.getType() == TreeEntity.TYPE.HOST) {// 点击主机加载系统盘
-                            CommonRequestSocketHandle h = new CommonRequestSocketHandle(
-                                    Client.newInstance().getSocket(), new FileService(), selectEntity.getIdentityId());
-                            FileInf inf = (FileInf) Proxy.newProxyInstance(FileService.class.getClassLoader(),
-                                    FileService.class.getInterfaces(), h);
-                            List<TreeFileList> list = inf.getRootList();
-                            List<TreeItem<TreeEntity>> disks = new ArrayList<TreeItem<TreeEntity>>();
-                            for (TreeFileList tfl : list) {
-                                TreeEntity diskEntity = new TreeEntity();
-                                diskEntity.setName(tfl.getFileName());
-                                diskEntity.setType(TreeEntity.TYPE.DISK);
-                                diskEntity.setIdentityId(selectEntity.getIdentityId());
-                                disks.add(new TreeItem<TreeEntity>(diskEntity));
-                            }
-                            selectItem.getChildren().clear();
-                            selectItem.getChildren().addAll(disks);
-                        } else if (selectEntity.getType() == TreeEntity.TYPE.DISK) {// 点击系统盘加载该系统盘下的所有目录和文件
-                            //等待页面，之后看情况优化
-                            Stage waitStage=Main.waitShow("连接硬盘中...");
-                            waitStage.show();
-                            Client.newInstance().getCachedThreadPool().execute(new Task<List<TreeFileList>>(){
+                for (MenuItem menuItem : menuItemList) {
+                    menuItem.setOnAction(param -> {
+                        MenuItem target = (MenuItem) param.getTarget();
+                        try {
+                            if ((int) target.getUserData() == MenuItemEnum.REMOTE_SREEN.VAL) {// 远程屏幕
+                                WaitStage waitStage = Main.waitShow("正在检测本地nat类型...");
+                                waitStage.show();
+                                Task<Void> task = new Task<Void>() {
+                                    @Override
+                                    protected Void call() throws Exception {
+                                        updateMessage("正在检测本地nat类型...");
+                                        InetAddress inetAddress = NatUtils.getLocalCoreInetAddress();
+                                        updateMessage("正在检测远端nat类型...");
+                                        Thread.sleep(1000);
+                                        updateMessage("正在检测11nat类型...");
+                                        Thread.sleep(1000);
+                                        updateMessage("正在检测22nat类型...");
+                                        Thread.sleep(1000);
+                                        return null;
+                                    }
 
-                                @Override
-                                protected List<TreeFileList> call() throws Exception {
-                                    CommonRequestSocketHandle h = new CommonRequestSocketHandle(
-                                            Client.newInstance().getSocket(), new FileService(), selectEntity.getIdentityId());
-                                    FileInf inf = (FileInf) Proxy.newProxyInstance(FileService.class.getClassLoader(),
-                                            FileService.class.getInterfaces(), h);
-                                    List<TreeFileList> list = inf.getFileList(selectEntity.getName());
-                                    return list;
-                                }
-
-                                protected void succeeded() {
-                                    try {
-                                        List<TreeFileList> list = get();
-                                        List<TreeItem<TreeEntity>> itemList = new ArrayList<TreeItem<TreeEntity>>();
-                                        for (TreeFileList tfl : list) {
-                                            itemList.add(setFileOrDirectoryItem(tfl, selectEntity.getIdentityId()));
-                                        }
-                                        selectItem.getChildren().clear();
-                                        selectItem.getChildren().addAll(itemList);
+                                    @Override
+                                    protected void succeeded() {
                                         waitStage.close();
-                                    } catch (InterruptedException | ExecutionException e) {
-                                        e.printStackTrace();
+                                    }
+
+                                    @Override
+                                    protected void failed() {
+                                        Alert alert = new Alert(Alert.AlertType.ERROR);
+                                        alert.setHeaderText("远程屏幕连接失败，"+getException().getMessage());
+                                        alert.showAndWait();
+                                        waitStage.close();
+                                    }
+
+
+                                };
+                                waitStage.bindProperty(task.messageProperty());
+                                Client.newInstance().getCachedThreadPool().execute(task);
+
+
+                                //2.检测远端nat类型
+                                //3.根据两端nat类型选择链接方式，开启远程屏幕服务（暂时仅支持p2p链接）
+                            } else if ((int) target.getUserData() == MenuItemEnum.CONNECT_HOST.VAL) {// 点击主机加载系统盘
+                                CommonRequestSocketHandle h = new CommonRequestSocketHandle(
+                                        Client.newInstance().getSocket(), new FileService(), selectEntity.getIdentityId());
+                                FileInf inf = (FileInf) Proxy.newProxyInstance(FileService.class.getClassLoader(),
+                                        FileService.class.getInterfaces(), h);
+                                List<TreeFileList> list = inf.getRootList();
+                                List<TreeItem<TreeEntity>> disks = new ArrayList<TreeItem<TreeEntity>>();
+                                for (TreeFileList tfl : list) {
+                                    TreeEntity diskEntity = new TreeEntity();
+                                    diskEntity.setName(tfl.getFileName());
+                                    diskEntity.setType(TreeEntity.TYPE.DISK);
+                                    diskEntity.setIdentityId(selectEntity.getIdentityId());
+                                    disks.add(new TreeItem<TreeEntity>(diskEntity));
+                                }
+                                selectItem.getChildren().clear();
+                                selectItem.getChildren().addAll(disks);
+                            } else if ((int) target.getUserData() == MenuItemEnum.CONNECT_DISK.VAL) {// 点击系统盘加载该系统盘下的所有目录和文件
+                                //等待页面，之后看情况优化
+                                Stage waitStage = Main.waitShow("连接硬盘中...");
+                                waitStage.show();
+                                Client.newInstance().getCachedThreadPool().execute(new Task<List<TreeFileList>>() {
+
+                                    @Override
+                                    protected List<TreeFileList> call() throws Exception {
+                                        CommonRequestSocketHandle h = new CommonRequestSocketHandle(
+                                                Client.newInstance().getSocket(), new FileService(), selectEntity.getIdentityId());
+                                        FileInf inf = (FileInf) Proxy.newProxyInstance(FileService.class.getClassLoader(),
+                                                FileService.class.getInterfaces(), h);
+                                        List<TreeFileList> list = inf.getFileList(selectEntity.getName());
+                                        return list;
+                                    }
+
+                                    protected void succeeded() {
+                                        try {
+                                            List<TreeFileList> list = get();
+                                            List<TreeItem<TreeEntity>> itemList = new ArrayList<TreeItem<TreeEntity>>();
+                                            for (TreeFileList tfl : list) {
+                                                itemList.add(setFileOrDirectoryItem(tfl, selectEntity.getIdentityId()));
+                                            }
+                                            selectItem.getChildren().clear();
+                                            selectItem.getChildren().addAll(itemList);
+                                            waitStage.close();
+                                        } catch (InterruptedException | ExecutionException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+
+                                    protected void failed() {
+                                        System.out.println("调用异常。。。。" + getException());
+                                        waitStage.close();
+                                    }
+
+                                });
+
+
+                            } else if ((int) target.getUserData() == MenuItemEnum.DOWNLOAD.VAL) {// 下载文件
+                                TreeItem<TreeEntity> hostItem = selectItem;
+                                do {
+                                    hostItem = hostItem.getParent();
+                                } while (hostItem.getValue().getType() != TreeEntity.TYPE.HOST);
+
+                                // 之后添加基础下载路径检测以及断点续传
+                                FileChooser chooser = new FileChooser();
+                                chooser.setTitle("下载文件到");
+                                chooser.setInitialFileName(selectEntity.getName());
+                                File file = chooser.showSaveDialog(null);
+                                if (file == null) {
+                                    return;
+                                }
+
+                                TableTask tt = new TableTask() {
+
+                                    @Override
+                                    protected Void call() throws Exception {
+                                        updateMessage("准备下载");
+                                        CommonRequestSocketHandle h = new CommonRequestSocketHandle(
+                                                Client.newInstance().getSocket(), new FileService(),
+                                                selectEntity.getIdentityId());
+                                        FileInf inf = (FileInf) Proxy.newProxyInstance(FileService.class.getClassLoader(),
+                                                FileService.class.getInterfaces(), h);
+                                        long blockSize = 1024 * 1024;// 之后改成可配置块大小
+                                        long blockCount = selectEntity.getFileSize() / blockSize;
+                                        blockCount = selectEntity.getFileSize() % blockSize == 0 ? blockCount
+                                                : blockCount + 1;
+
+                                        BufferedOutputStream bos = new BufferedOutputStream(
+                                                new FileOutputStream(file, false));
+                                        for (int i = 1; i <= blockCount; i++) {
+                                            updateMessage("下载中..." + i + "/" + blockCount);
+                                            byte[] bytes = inf.getFilePart(selectEntity.getFilePath(), (int) blockSize, i);// 强转方法不合理
+                                            bos.write(bytes);
+                                            updateProgress(i, blockCount);
+                                        }
+                                        updateMessage("下载完成");
+                                        bos.flush();
+                                        bos.close();
+
+                                        return null;
+                                    }
+
+                                    @Override
+                                    protected void failed() {
+                                        super.failed();
+                                        System.out.println("下载异常：" + getException());
+                                        updateMessage("下载失败");
                                     }
 
                                 };
+                                tt.setSrc(hostItem.getValue().getName());
+                                tt.setFileName(selectEntity.getName());
+                                table.getItems().add(tt);
 
-                                protected void failed() {
-                                    System.out.println("调用异常。。。。"+getException());
-                                    waitStage.close();
-                                };
-
-                            });
-
-
-                        } else if (selectEntity.getType() == TreeEntity.TYPE.FILE) {// 下载文件
-                            TreeItem<TreeEntity> hostItem = selectItem;
-                            do {
-                                hostItem = hostItem.getParent();
-                            } while (hostItem.getValue().getType() != TreeEntity.TYPE.HOST);
-
-                            // 之后添加基础下载路径检测以及断点续传
-                            FileChooser chooser = new FileChooser();
-                            chooser.setTitle("下载文件到");
-                            chooser.setInitialFileName(selectEntity.getName());
-                            File file = chooser.showSaveDialog(null);
-                            if (file == null) {
-                                return;
+                                Client.newInstance().getCachedThreadPool().execute(tt);
                             }
-
-                            TableTask tt = new TableTask() {
-
-                                @Override
-                                protected Void call() throws Exception {
-                                    updateMessage("准备下载");
-                                    CommonRequestSocketHandle h = new CommonRequestSocketHandle(
-                                            Client.newInstance().getSocket(), new FileService(),
-                                            selectEntity.getIdentityId());
-                                    FileInf inf = (FileInf) Proxy.newProxyInstance(FileService.class.getClassLoader(),
-                                            FileService.class.getInterfaces(), h);
-                                    long blockSize = 1024 * 1024;// 之后改成可配置块大小
-                                    long blockCount = selectEntity.getFileSize() / blockSize;
-                                    blockCount = selectEntity.getFileSize() % blockSize == 0 ? blockCount
-                                            : blockCount + 1;
-
-                                    BufferedOutputStream bos = new BufferedOutputStream(
-                                            new FileOutputStream(file, false));
-                                    for (int i = 1; i <= blockCount; i++) {
-                                        updateMessage("下载中..." + i + "/" + blockCount);
-                                        byte[] bytes = inf.getFilePart(selectEntity.getFilePath(), (int) blockSize, i);// 强转方法不合理
-                                        bos.write(bytes);
-                                        updateProgress(i, blockCount);
-                                    }
-                                    updateMessage("下载完成");
-                                    bos.flush();
-                                    bos.close();
-
-                                    return null;
-                                }
-
-                                @Override
-                                protected void failed() {
-                                    super.failed();
-                                    System.out.println("下载异常：" + getException());
-                                    updateMessage("下载失败");
-                                }
-
-                            };
-                            tt.setSrc(hostItem.getValue().getName());
-                            tt.setFileName(selectEntity.getName());
-                            table.getItems().add(tt);
-
-                            Client.newInstance().getCachedThreadPool().execute(tt);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
                         }
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
-                });
+                    });
+                }
 
-                myMenu.getItems().add(menuItem);
+                myMenu.getItems().addAll(menuItemList);
                 myMenu.show(tree, e.getScreenX(), e.getScreenY());
             }
         });
     }
 
     //初始化树的数据
-    private void initTreeData() throws IOException{
+    private void initTreeData() throws IOException {
         // 设置根节点
         TreeEntity root = new TreeEntity();
         root.setType(TreeEntity.TYPE.ROOT);
@@ -306,12 +359,12 @@ public class HomeController implements Initializable {
         tree.setRoot(new TreeItem<TreeEntity>(root));
 
         // 获取当前在线用户并设置节点
-        HostInf inf=(HostInf) RmiClient.lookup(Client.newInstance().getSocket(), HostInf.class.getName());
-        List<HostEntity> list=inf.getOnlineHostEntity();
-        if(list==null||list.size()==0){
+        HostInf inf = (HostInf) RmiClient.lookup(Client.newInstance().getSocket(), HostInf.class.getName());
+        List<HostEntity> list = inf.getOnlineHostEntity();
+        if (list == null || list.size() == 0) {
             return;
         }
-        for(HostEntity he:list){
+        for (HostEntity he : list) {
             TreeEntity treeEntity = new TreeEntity();
             treeEntity.setName(he.getName());
             treeEntity.setIdentityId(he.getIdentityId());
@@ -326,7 +379,7 @@ public class HomeController implements Initializable {
         src.setCellValueFactory(new PropertyValueFactory<TableTask, String>("src"));
         fileName.setCellValueFactory(new PropertyValueFactory<TableTask, String>("fileName"));
         download.setCellValueFactory(new PropertyValueFactory<TableTask, Double>("progress"));
-        download.setCellFactory(ProgressBarTableCell.<TableTask> forTableColumn());
+        download.setCellFactory(ProgressBarTableCell.<TableTask>forTableColumn());
         status.setCellValueFactory(new PropertyValueFactory<TableTask, String>("message"));
 
     }

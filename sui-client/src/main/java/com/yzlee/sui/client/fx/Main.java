@@ -1,7 +1,9 @@
 package com.yzlee.sui.client.fx;
 
 import com.yzlee.sui.client.Client;
+import com.yzlee.sui.client.modle.WaitStage;
 import javafx.application.Application;
+import javafx.beans.property.ReadOnlyProperty;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
@@ -47,25 +49,8 @@ public class Main extends Application {
         launch(args);
     }
 
-    public static Stage waitShow(String message) throws IOException {
-        if (primaryStage == null) {
-            // 抛异常
-        }
-        VBox wait = FXMLLoader.load(Main.class.getResource("/view/wait.fxml"));
-        Stage stage = new Stage();
-        Scene scene = new Scene(wait);
-        scene.setFill(null);
-        stage.setScene(scene);
-        stage.initOwner(primaryStage);
-        stage.initStyle(StageStyle.TRANSPARENT);
-        stage.initModality(Modality.APPLICATION_MODAL);
-        stage.setWidth(primaryStage.getWidth());
-        stage.setHeight(primaryStage.getHeight());
-        stage.setX(primaryStage.getX());
-        stage.setY(primaryStage.getY());
-        Label label = (Label) wait.lookup("#title");
-        label.setText(message);
-        return stage;
+    public static WaitStage waitShow(String message) throws IOException {
+        return new WaitStage(primaryStage, message);
     }
 
     public static Stage getPrimaryStage() {
