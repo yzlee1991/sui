@@ -25,8 +25,9 @@ public class ResponseSocketHandle extends AbstractSocketHandle implements Invoca
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         ProtocolEntity entity = new ProtocolEntity();
+        Object returnValue = null;
         try {
-            Object returnValue = method.invoke(target, args);
+            returnValue = method.invoke(target, args);
             byte[] bytes = CommonUtils.ObjectToByteArray(returnValue);
             String base64Reply = Base64.encode(bytes);
 
@@ -49,7 +50,7 @@ public class ResponseSocketHandle extends AbstractSocketHandle implements Invoca
         }
         SocketUtils.send(socket, entity);
 
-        return null;
+        return returnValue;
 
     }
 
