@@ -7,6 +7,7 @@ import com.yzlee.sui.common.utils.CommonUtils;
 import com.yzlee.sui.common.utils.SocketUtils;
 
 import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
 
@@ -45,6 +46,9 @@ public class ResponseSocketHandle extends AbstractSocketHandle implements Invoca
             entity.setType(ProtocolEntity.Type.RESPONSE);
             entity.setReplyState(ProtocolEntity.ReplyState.ERROR);
             entity.setReply(e.getMessage());// 先简单处理，之后输出整个异常栈信息
+            if (e instanceof InvocationTargetException) {//解决反射调用方法时方法抛出异常被包装成InvocationTargetException无法直接获取原始异常信息的问题
+                entity.setReply(((InvocationTargetException) e).getTargetException().getMessage());
+            }
             // entity.setIdentityId(identityId);
             entity.setTargetId(targetId);
         }
