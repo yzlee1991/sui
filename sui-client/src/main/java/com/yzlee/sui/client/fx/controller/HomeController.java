@@ -12,7 +12,9 @@ import com.yzlee.sui.client.modle.WaitStage;
 import com.yzlee.sui.common.abs.Filter;
 import com.yzlee.sui.common.inf.FileInf;
 import com.yzlee.sui.common.inf.HostInf;
+import com.yzlee.sui.common.inf.NatInf;
 import com.yzlee.sui.common.modle.TreeFileList;
+import com.yzlee.sui.common.modle.nat.MyDiscoveryInfo;
 import com.yzlee.sui.common.modle.push.HostEntity;
 import com.yzlee.sui.common.modle.push.HostOnlineEvent;
 import com.yzlee.sui.common.modle.push.HostOutlineEvent;
@@ -20,7 +22,9 @@ import com.yzlee.sui.common.modle.push.PushEvent;
 import com.yzlee.sui.common.proxy.CommonRequestSocketHandle;
 import com.yzlee.sui.common.rmi.RmiClient;
 import com.yzlee.sui.common.service.FileService;
+import com.yzlee.sui.common.service.NatService;
 import com.yzlee.sui.common.utils.NatUtils;
+import de.javawi.jstun.test.DiscoveryInfo;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -192,14 +196,17 @@ public class HomeController implements Initializable {
                                 Task<Void> task = new Task<Void>() {
                                     @Override
                                     protected Void call() throws Exception {
+                                        //1.检测两端nat网络情况，都在客户端以调用的方式完成（重客户端，轻服务端）
                                         updateMessage("正在检测本地nat类型...");
-                                        InetAddress inetAddress = NatUtils.getLocalCoreInetAddress();
+                                        MyDiscoveryInfo discoveryInfo = NatUtils.getLocalCoreInetAddress();
                                         updateMessage("正在检测远端nat类型...");
-                                        Thread.sleep(1000);
-                                        updateMessage("正在检测11nat类型...");
-                                        Thread.sleep(1000);
-                                        updateMessage("正在检测22nat类型...");
-                                        Thread.sleep(1000);
+                                        CommonRequestSocketHandle h = new CommonRequestSocketHandle(
+                                                Client.newInstance().getSocket(), new NatService(), selectEntity.getIdentityId());
+                                        NatInf inf = (NatInf) Proxy.newProxyInstance(NatService.class.getClassLoader(),
+                                                NatService.class.getInterfaces(), h);
+                                        MyDiscoveryInfo remoteDiscoveryInfo = inf.getRemoteCoreInetAddress();
+                                        //2.根据两端nat类型选择链接方式，开启远程屏幕服务（暂时仅支持p2p链接）
+                                        updateMessage("正在尝试进行udp打洞...");
                                         return null;
                                     }
 
@@ -211,7 +218,7 @@ public class HomeController implements Initializable {
                                     @Override
                                     protected void failed() {
                                         Alert alert = new Alert(Alert.AlertType.ERROR);
-                                        alert.setHeaderText("远程屏幕连接失败，"+getException().getMessage());
+                                        alert.setHeaderText("远程屏幕连接失败，" + getException().getMessage());
                                         alert.showAndWait();
                                         waitStage.close();
                                     }
@@ -222,8 +229,6 @@ public class HomeController implements Initializable {
                                 Client.newInstance().getCachedThreadPool().execute(task);
 
 
-                                //2.检测远端nat类型
-                                //3.根据两端nat类型选择链接方式，开启远程屏幕服务（暂时仅支持p2p链接）
                             } else if ((int) target.getUserData() == MenuItemEnum.CONNECT_HOST.VAL) {// 点击主机加载系统盘
                                 CommonRequestSocketHandle h = new CommonRequestSocketHandle(
                                         Client.newInstance().getSocket(), new FileService(), selectEntity.getIdentityId());
